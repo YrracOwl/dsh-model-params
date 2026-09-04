@@ -26,11 +26,19 @@ const FIXTURE = {
     },
   },
   noisy: { id: 'noisy', name: 'Noisy', models: { 'empty-model': { id: 'empty-model' } } },
+  // Gateway mirrors that key their catalog copies with vendor prefixes.
+  tokengo: {
+    id: 'tokengo', name: 'TokenGo',
+    models: {
+      'deepseek/deepseek-v4-flash': { id: 'deepseek/deepseek-v4-flash', name: 'DeepSeek V4 Flash', limit: { context: 1000000, output: 384000 } },
+      'z-ai/glm-5.3-flash': { id: 'z-ai/glm-5.3-flash', name: 'GLM-5.3-Flash', limit: { context: 1000000, output: 131072 } },
+    },
+  },
 }
 
 test('parses the real flat catalog shape defensively', () => {
   const index = parseModelsDevCatalog(FIXTURE)
-  assert.equal(index.size, 5)
+  assert.equal(index.size, 7)
   const flash = index.get('deepseek-v4-flash')[0]
   assert.equal(flash.providerId, 'deepseek')
   assert.equal(flash.context, 1000000)
@@ -58,6 +66,13 @@ test('near match inside the hinted provider covers versioned ids', () => {
   assert.equal(result.unmatched.length, 0)
   assert.equal(result.matched[0].providerId, 'deepseek')
   assert.equal(result.matched[0].modelId, 'deepseek-v4-flash')
+})
+
+test('official vendor record wins over a prefixed gateway mirror', () => {
+  const index = parseModelsDevCatalog(FIXTURE)
+  const result = lookupModels(index, ['deepseek/deepseek-v4-flash', 'z-ai/glm-5.3-flash'])
+  assert.equal(result.matched[0].providerId, 'deepseek')
+  assert.equal(result.matched[1].providerId, 'zai')
 })
 
 test('catalog provider order breaks exact-id ties when no hint applies', () => {
