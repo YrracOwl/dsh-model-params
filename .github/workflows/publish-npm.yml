@@ -1,0 +1,55 @@
+name: Release and publish dsh-model-params
+
+on:
+  push:
+    tags: ['v*.*.*']
+
+permissions:
+  contents: write
+  id-token: write
+
+concurrency:
+  group: release-dsh-model-params-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  release-and-publish:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out tagged source
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref }}
+          fetch-depth: 0
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          registry-url: https://registry.npmjs.org
+          cache: npm
+          cache-dependency-path: package.json
+      - name: Upgrade npm for Trusted Publishing
+        run: npm install --global npm@latest
+      - name: Verify tag matches package version
+        shell: bash
+        run: test "${GITHUB_REF_NAME#v}" = "$(node -p "require('./package.json').version")"
+      - name: Install dependencies without lifecycle scripts
+        run: npm install --no-package-lock --ignore-scripts
+      - name: Run tests and checks
+        run: npm test && npm run check --if-present
+      - name: Verify package contents
+        run: npm pack --dry-run
+      - name: Create GitHub Release
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const tag = context.ref.replace('refs/tags/', '')
+            try {
+              await github.rest.repos.getReleaseByTag({ owner: context.repo.owner, repo: context.repo.repo, tag })
+              core.info(`Release ${tag} already exists`)
+            } catch (error) {
+              if (error.status !== 404) throw error
+              await github.rest.repos.createRelease({ owner: context.repo.owner, repo: context.repo.repo, tag_name: tag, target_commitish: context.sha, generate_release_notes: true })
+            }
+      - name: Publish with npm Trusted Publishing
+        run: npm publish --access public --provenance

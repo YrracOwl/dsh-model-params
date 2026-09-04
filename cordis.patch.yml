@@ -1,0 +1,5 @@
+# dsh-model-params bundle patch.
+# Host-plane single instance: do not copy this row into an agent preset.
+- insert:
+    - id: model-params
+      name: 'dsh-model-params'
