@@ -42,6 +42,7 @@ test('client writes only on an explicit apply and defaults to fill-missing', () 
   assert.match(client, /overwrite/)
   assert.match(client, /仅补缺失/)
   assert.match(client, /api\.settings\.mutate/)
+  assert.match(client, /setOpen\(false\)/)
   assert.match(client, /contextWindow/)
   assert.match(client, /maxTokens/)
   assert.match(client, /reasoningEfforts/)
@@ -59,6 +60,15 @@ test('lookup endpoint usage and timeout/cleanup are present', () => {
   assert.match(client, /\/api\/model-params\/lookup/)
   assert.match(client, /AbortController/)
   assert.match(client, /clearTimeout\(timer\)/)
+})
+
+test('shared proxy control is visible at the top and forwarded to Host', () => {
+  assert.match(client, /使用公共 models\.dev 请求代理/)
+  assert.match(client, /proxyState\.enabled/)
+  assert.match(client, /refreshProxy\(\(value\) => value \+ 1\)/)
+  assert.match(client, /proxy=/)
+  assert.match(host, /searchParams\.get\('proxy'\)/)
+  assert.match(host, /new ProxyAgent\(proxy\)/)
 })
 
 test('README discloses scope and the apply-to-this-provider boundary', () => {
