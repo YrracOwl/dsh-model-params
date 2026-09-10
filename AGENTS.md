@@ -39,6 +39,7 @@ After bundle or manifest changes refresh the workspace metadata generator (`node
 - models.dev shape or matching change: update `lib/modelsdev.js` and both test files together.
 - Effort policy change: update both `THINKING_LEVELS`/`intersectLevels` copies and their guards.
 - Provider-card owner-props change upstream: re-verify the defensive route derivation and the UI on the real Models page.
+- Install-surface change: `README.md` is the only user-facing install surface, so keep its recommended `dsh plugin --profile web add dsh-model-params` command and the required DSH Web restart current.
 
 ## Pitfalls
 
