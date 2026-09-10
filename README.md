@@ -2,7 +2,7 @@
 
 ## English
 
-**Current release: 0.1.4** — models.dev parameter assistant inside the official DeepSeek Harness Models settings page.
+**Current release: 0.1.5** — models.dev parameter assistant inside the official DeepSeek Harness Models settings page. This release adds a documented install path: `dsh plugin --profile web add dsh-model-params`.
 
 For every configured `llm-pi-ai` provider card (custom OpenAI-compatible gateways such as the ones you add under Settings → Models), a `models.dev 参数` control fetches the official models.dev records for the provider's configured model ids and proposes the metadata pi-ai needs: context window, max output tokens, and reasoning-effort levels. One click writes the merged `models` array back to that provider profile through the official revision-aware Settings API.
 
@@ -24,6 +24,22 @@ models.dev model ids may collide across catalog providers; the matcher prefers t
 - 窗口顶部可启用一个所有 provider 共用的 models.dev 请求代理并编辑地址；它只影响下一次参数查询，不改变任何 LLM provider 的 `baseURL`。
 - Host 只负责拉取并缓存 models.dev 目录（6 小时，支持公共代理或 `HTTPS_PROXY` 回退），不接触任何 LLM 配置与凭据。
 - models.dev 未收录的模型 id 会明确标记，不写入。
+
+## Install
+
+```powershell
+dsh plugin --profile web add dsh-model-params
+```
+
+Restart the existing DSH Web process afterwards: the Host scans the browser plugin roster at startup, so the provider-card control appears only after that restart. Then open **Settings → Models** and look for `models.dev 参数` on a configured provider card.
+
+Local development, from this package directory:
+
+```powershell
+dsh plugin --profile web add .
+```
+
+Either form records the package in the profile's `dsh.profile.bundles`, which is what mounts the Host lookup route and serves the client bundle.
 
 ## Development
 
