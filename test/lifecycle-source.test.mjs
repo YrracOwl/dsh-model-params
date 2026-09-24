@@ -26,12 +26,23 @@ test('host exposes one fenced lookup route and never writes settings', () => {
 test('client follows the ModuleLoader factory contract and injects dotted remotes', () => {
   assert.match(client, /factory: \(require\) => \{\s*const module = \{ exports: \{\} \}/)
   assert.match(client, /return module\.exports/)
-  assert.match(client, /exports\.inject = \['slots', 'settingsScope', 'remote', 'remote\.settings'\]/)
+  // NEITHER settings transport may appear in exports.inject: cordis treats every
+  // inject name as a REQUIRED gate, so declaring the optional transport leaves the
+  // plugin permanently pending and fails Web boot. The official pi-ai scope is
+  // awaited in apply as ctx.inject([...], cb) instead.
+  assert.match(client, /exports\.inject = \['slots', 'remote', 'remote\.settings'\]/)
+  assert.match(client, /function resolveSettingsScopeFrom\(ctx, namespace\)/)
+  assert.match(client, /ctx\.inject\(\['settingsScope'\], registerCard\)/)
+  assert.match(client, /ctx\.inject\(\['configForms'\], \(sctx\) => \{ if \(!cardRegistered\) registerCard\(sctx\) \}\)/)
+  assert.doesNotMatch(client, /exports\.inject = \[[^\]]*settingsScope/)
+  assert.doesNotMatch(client, /exports\.inject = \[[^\]]*configForms/)
+  assert.doesNotMatch(client, /ctx\.settingsScope\.bind/)
   assert.doesNotMatch(client, /'connection'|ctx\.get\('connection'\)/)
 })
 
 test('client registers the official provider-card slot keyed to the pi-ai namespace', () => {
-  assert.match(client, /settings\.models\.provider-card/)
+  // 卡片必须在设置传输的子上下文上注册（sctx.slots），见 client.js 的 registerCard。
+  assert.match(client, /sctx\.slots\.inject\('settings\.models\.provider-card'/)
   assert.match(client, /key: PI_NS/)
   assert.match(client, /PI_NS = 'llm-pi-ai'/)
   assert.match(client, /path: \['providers', route, 'models'\]/)
