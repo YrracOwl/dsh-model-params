@@ -2,7 +2,7 @@
 
 ## English
 
-**Current release: 0.1.5** — models.dev parameter assistant inside the official DeepSeek Harness Models settings page. This release adds a documented install path: `dsh plugin --profile web add dsh-model-params`.
+**Current release: 0.1.6** — Portable settings transport: the plugin now resolves the official pi-ai settings scope on both the `settingsScope` (≤ 0.1.5) and `configForms` (≥ 0.1.7-rc.1) hosts, so the provider card keeps working across the rename.
 
 For every configured `llm-pi-ai` provider card (custom OpenAI-compatible gateways such as the ones you add under Settings → Models), a `models.dev 参数` control fetches the official models.dev records for the provider's configured model ids and proposes the metadata pi-ai needs: context window, max output tokens, and reasoning-effort levels. One click writes the merged `models` array back to that provider profile through the official revision-aware Settings API.
 
