@@ -6,6 +6,8 @@
 
 For every configured `llm-pi-ai` provider card (custom OpenAI-compatible gateways such as the ones you add under Settings → Models), a `models.dev 参数` control fetches the official models.dev records for the provider's configured model ids and proposes the metadata pi-ai needs: context window, max output tokens, and reasoning-effort levels. One click writes the merged `models` array back to that provider profile through the official revision-aware Settings API.
 
+On hosts that declare the root-scope `settings.section` list seat, that same card is also registered as a first-class settings page — identity `YOTK · Model Params`, id `yotk-model-params`, order `63` — additive beside the Models-page extension and never an activation gate. The page needs nothing selected elsewhere: it reads the `llm-pi-ai` providers you have configured through the same settings scope, addresses the first one (with a picker whenever several exist), and states plainly when the namespace is loading, unserved, or has no provider yet.
+
 Safety boundaries:
 
 - The control never auto-writes. You open the panel, review the per-model diff, then click **应用并写入该 provider** — it writes only that provider's `models` array in the `llm-pi-ai` namespace.
@@ -20,6 +22,8 @@ models.dev model ids may collide across catalog providers; the matcher prefers t
 
 面向 DeepSeek Harness Web 官方 **设置 → 模型** 页的 models.dev 参数助手。每个已配置的 `llm-pi-ai` provider 卡片内提供 `models.dev 参数` 入口：按该 provider 的模型 id 在 models.dev 官方目录中匹配，预览上下文窗口 / max 输出 / 推理档位，确认后一次性写回该 provider 的 `models` 配置（官方 revision-aware Settings API，仅写 `llm-pi-ai` 命名空间下当前 provider 的数组）。
 
+在声明根级 `settings.section` 列表座的宿主上，同一张卡片还会注册为设置页的一级入口 —— 标识 `YOTK · Model Params`、id `yotk-model-params`、order `63` —— 与「设置 → 模型」页的扩展并存，且从不成为激活门槛。该页不依赖别处选中的 provider：它通过同一设置作用域读取已配置的 `llm-pi-ai` provider，默认处理第一个（配置多个时可在页内切换），并在命名空间仍在读取、宿主未提供或尚未配置 provider 时明确说明。
+
 - 默认仅补缺失参数；勾选「覆盖已有值」才替换差异值。
 - 窗口顶部可启用一个所有 provider 共用的 models.dev 请求代理并编辑地址；它只影响下一次参数查询，不改变任何 LLM provider 的 `baseURL`。
 - Host 只负责拉取并缓存 models.dev 目录（6 小时，支持公共代理或 `HTTPS_PROXY` 回退），不接触任何 LLM 配置与凭据。
@@ -31,7 +35,7 @@ models.dev model ids may collide across catalog providers; the matcher prefers t
 dsh plugin --profile web add dsh-model-params
 ```
 
-Restart the existing DSH Web process afterwards: the Host scans the browser plugin roster at startup, so the provider-card control appears only after that restart. Then open **Settings → Models** and look for `models.dev 参数` on a configured provider card.
+Restart the existing DSH Web process afterwards: the Host scans the browser plugin roster at startup, so the provider-card control appears only after that restart. Then open **Settings → Models** and look for `models.dev 参数` on a configured provider card. Where the host also exposes the settings page seat, the same control is one click deep in **Settings** as **YOTK · Model Params**.
 
 Local development, from this package directory:
 
