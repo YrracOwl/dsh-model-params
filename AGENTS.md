@@ -8,10 +8,10 @@
 
 ## Key Files
 
-- `lib/modelsdev.js`: pure models.dev catalog parsing, id matching (exact → last-path-segment), effort intersection with pi-ai thinking levels.
-- `lib/index.js`: Host `webServer` route `GET /api/model-params/lookup?ids=…` with origin/host fences, 6h in-memory cache, optional `HTTPS_PROXY` fallback via undici.
+- `lib/modelsdev.js`: pure models.dev catalog parsing, id matching (**provider route → id vendor prefix → unmatched**), effort intersection with pi-ai thinking levels.
+- `lib/index.js`: Host `webServer` route `GET /api/model-params/lookup?ids=…&route=…` with origin/host fences, 6h in-memory cache, optional `HTTPS_PROXY` fallback via undici.
 - `lib/client.js`: `__ModuleLoader__` bundle registering the `settings.models.provider-card` occupant keyed `llm-pi-ai`; preview panel + apply-this-provider write through the official Settings scope.
-- `test/modelsdev.test.mjs`, `test/lifecycle-source.test.mjs`: pure matcher guards and structural guards.
+- `test/modelsdev.test.mjs`, `test/lifecycle-source.test.mjs`, `test/route-match.test.mjs`, `test/efforts.test.mjs`: matcher guards, structural guards, route-preference guards, and behavioural reasoning-effort guards.
 - `test/efforts.test.mjs`: BEHAVIOURAL guards for the reasoning-effort rules. A client bundle cannot `require('./x.js')` (its `require` resolves platform seeds only), so this suite extracts the `// #region reasoning-efforts` block from `lib/client.js` and runs it in a VM. Assert on behaviour, not source text: a source-text test passes for an implementation that merely mentions the right words.
 
 ## Invariants
@@ -48,6 +48,7 @@ After bundle or manifest changes refresh the workspace metadata generator (`node
 ## Change Checklist
 
 - models.dev shape or matching change: update `lib/modelsdev.js` and both test files together.
+- **A model id alone does not identify catalog facts.** models.dev lists one id under dozens of providers with different limits (measured 2026-10-17: `deepseek/deepseek-v4.1-flash` is 1000000/384000 at CommandCode, 1048576/65536 at SenseNova, 131072/8192 at NEAR). The lookup is therefore keyed by the **provider route being edited**, and `lookupModels` resolves in this order: route's own catalog provider (case-insensitive) → id vendor prefix → unmatched. It must NOT fall back to "the first record with metadata": a wrong context window silently breaks every request on that route, which is worse than reporting 未收录. The client sends `&route=` and stamps the answer with it; `test/route-match.test.mjs` pins all of this.
 - Effort policy change: update both `THINKING_LEVELS`/`intersectLevels` copies and their guards.
 - Provider-card owner-props change upstream: re-verify the defensive route derivation and the UI on the real Models page.
 - Section-seat owner-props change upstream (`SettingsSectionOwnerProps`): re-verify that the page still resolves a real provider on its own, still offers a chooser only among real routes, and still explains an empty/unavailable namespace.

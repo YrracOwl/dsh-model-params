@@ -1,6 +1,6 @@
 {
   "name": "dsh-model-params",
-  "version": "0.1.8",
+  "version": "0.1.9",
   "description": "EN: models.dev parameter assistant for the official DeepSeek Harness Models page: per-provider one-click context / max-output / reasoning-effort fill, written in the official reasoningEfforts shape. ZH: 官方模型设置页的 models.dev 参数助手：按 provider 一键补全上下文、max 输出与推理档位，并写入官方 reasoningEfforts 形状。",
   "type": "module",
   "main": "lib/index.js",
