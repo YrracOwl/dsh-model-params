@@ -257,9 +257,15 @@ test('the settings.section page renders the same card component as the provider-
   assert.equal(sectionPage.type, cardPage.type)
   assert.equal(sectionPage.props.scope, cardPage.props.scope)
   // neither `close` nor the host-owned optional `form` prop is consumed. The
-  // only extra prop is the disclosure default: this page holds ONE card, so its
-  // panel must start expanded (pinned behaviourally below).
-  assert.deepEqual(Object.keys(sectionPage.props).sort(), ['api', 'defaultOpen', 'scope'])
+  // extra props are the disclosure default (this page holds ONE card, so its
+  // panel must start expanded — pinned behaviourally below) and the resolver for
+  // the HOST-DECLARED reasoning-level space, which both seats must share so the
+  // same model always gets the same vocabulary. `resolveLevels` is a function
+  // onto the live services, not a value: it is called on render so the card sees
+  // a schema that arrived after mount.
+  assert.deepEqual(Object.keys(sectionPage.props).sort(), ['api', 'defaultOpen', 'resolveLevels', 'scope'])
+  assert.equal(typeof sectionPage.props.resolveLevels, 'function')
+  assert.equal(sectionPage.props.resolveLevels, cardPage.props.resolveLevels)
   const passedForm = section.component({ close: () => {}, form: { state: {}, mutate() {} } })
   assert.equal(passedForm.type, sectionPage.type)
   assert.equal(passedForm.props.scope, sectionPage.props.scope)
@@ -284,6 +290,11 @@ function createHookHost() {
         const set = (next) => { state[index] = typeof next === 'function' ? next(state[index]) : next }
         return [state[index], set]
       },
+      // `useMemo` is a hook slot like any other. This host recomputes on every
+      // pass (no dependency cache) — the card's memoized values are pure reads of
+      // live services, so recomputing is behaviourally identical and keeps the
+      // harness honest about the render path rather than about memo identity.
+      useMemo(factory) { cursor++; return factory() },
       useEffect() { cursor++; return undefined },
       useRef(value) { cursor++; return { current: value } },
     },
@@ -412,8 +423,8 @@ test('the section page offers every real llm-pi-ai route and addresses the chose
   host.mount()
   const element = section.component({ close: () => {} })
   const rendered = host.render(element.type, element.props)
-  // `close` alone arrived: the routes came from the namespace's own snapshot
-  assert.deepEqual(Object.keys(element.props).sort(), ['api', 'defaultOpen', 'scope'])
+  // `close` alone arrived: the routes came from the namespace's own snapshot.
+  assert.deepEqual(Object.keys(element.props).sort(), ['api', 'defaultOpen', 'resolveLevels', 'scope'])
   // and a lookup answer is stamped with the route it was requested for, so a
   // response that lands after the page moved on cannot be shown beside another
   // provider's models

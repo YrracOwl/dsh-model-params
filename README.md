@@ -2,9 +2,24 @@
 
 ## English
 
-**Current release: 0.1.6** — Portable settings transport: the plugin now resolves the official pi-ai settings scope on both the `settingsScope` (≤ 0.1.5) and `configForms` (≥ 0.1.7-rc.1) hosts, so the provider card keeps working across the rename.
+**Current release: 0.1.8** — Reasoning efforts now follow the **official declaration shape** introduced on the DSH 0.2.1 line: keys are pi-ai thinking levels, values are the *wire* strings actually sent (with `off` as `null`), and the level list is read from the host's own schema the way the official Models page reads it. Previous releases wrote `value = level` and the string `'off'`, which silently mismapped any gateway whose wire vocabulary differs from pi-ai's.
 
 For every configured `llm-pi-ai` provider card (custom OpenAI-compatible gateways such as the ones you add under Settings → Models), a `models.dev 参数` control fetches the official models.dev records for the provider's configured model ids and proposes the metadata pi-ai needs: context window, max output tokens, and reasoning-effort levels. One click writes the merged `models` array back to that provider profile through the official revision-aware Settings API.
+
+### Reasoning efforts follow the official declaration shape
+
+DSH 0.2.1 added a per-model reasoning-effort editor to the official Models page (`ModelReasoningEfforts` in `dsh-client-ui-settings-models`); the Host validates the same field in `dsh-llm-pi-ai`. This plugin writes that exact shape rather than an approximation of it:
+
+```jsonc
+"reasoningEfforts": { "off": null, "low": "low", "high": "high" }
+```
+
+- The **key** is a pi-ai thinking level (`off`, `minimal`, `low`, `medium`, `high`, `xhigh`, `max`).
+- The **value** is the *wire* string actually sent for that level. It is **not** the level name in general: a gateway may map `low` onto the wire value `"medium"`, and the panel shows that as `low=medium` instead of hiding it behind the key.
+- Only `off` may be `null` (it sends nothing); every other level needs a non-empty string.
+- The level list is read from the **host's own schema** (`ctx.settingsSchema` + the `llm-pi-ai` namespace view) with the same walk the official page performs. A host that cannot answer falls back to the same fixed list.
+- The plugin refuses to emit a map the Host would reject: `{}`, `off` alone, or a non-`off` level with an empty value fails the **whole route**, so it declines to write rather than break a provider.
+- A level your gateway already declares is preserved verbatim unless you tick **覆盖已有值**; `reasoningEfforts: false` (a deliberately non-reasoning model) is never widened.
 
 On hosts that declare the root-scope `settings.section` list seat, that same card is also registered as a first-class settings page — identity `YOTK · Model Params`, id `yotk-model-params`, order `63` — additive beside the Models-page extension and never an activation gate. The page needs nothing selected elsewhere: it reads the `llm-pi-ai` providers you have configured through the same settings scope, addresses the first one (with a picker whenever several exist), and states plainly when the namespace is loading, unserved, or has no provider yet.
 
