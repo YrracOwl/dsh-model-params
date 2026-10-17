@@ -48,7 +48,13 @@ After bundle or manifest changes refresh the workspace metadata generator (`node
 ## Change Checklist
 
 - models.dev shape or matching change: update `lib/modelsdev.js` and both test files together.
-- **A model id alone does not identify catalog facts.** models.dev lists one id under dozens of providers with different limits (measured 2026-10-17: `deepseek/deepseek-v4.1-flash` is 1000000/384000 at CommandCode, 1048576/65536 at SenseNova, 131072/8192 at NEAR). The lookup is therefore keyed by the **provider route being edited**, and `lookupModels` resolves in this order: route's own catalog provider (case-insensitive) → id vendor prefix → unmatched. It must NOT fall back to "the first record with metadata": a wrong context window silently breaks every request on that route, which is worse than reporting 未收录. The client sends `&route=` and stamps the answer with it; `test/route-match.test.mjs` pins all of this.
+- **A model id alone does not identify catalog facts, and neither does a route name.** models.dev lists one id under dozens of providers with different limits (measured 2026-10-17: `deepseek/deepseek-v4.1-flash` is 1000000/384000 at CommandCode, 1048576/65536 at SenseNova, 131072/8192 at NEAR). Resolution order:
+  1. **the route's `baseURL` against the catalog provider's `api`** — the endpoint is what a deployment IS, and one gateway can carry several account names (our `commandcode` and `goat-163` share `api.commandcode.ai` and must share one record, with no per-route table);
+  2. the route id, when it happens to name a catalog provider;
+  3. the model id's vendor prefix;
+  4. unmatched.
+
+  It must NOT fall back to "the first record with metadata": a wrong context window silently breaks every request on that route, which is worse than reporting 未收录. `normalizeApi` compares scheme+host+path and ignores case, a trailing slash, and default ports. The client sends `&route=` and `&baseURL=`; `test/baseurl-match.test.mjs` and `test/route-match.test.mjs` pin all of this.
 - Effort policy change: update both `THINKING_LEVELS`/`intersectLevels` copies and their guards.
 - Provider-card owner-props change upstream: re-verify the defensive route derivation and the UI on the real Models page.
 - Section-seat owner-props change upstream (`SettingsSectionOwnerProps`): re-verify that the page still resolves a real provider on its own, still offers a chooser only among real routes, and still explains an empty/unavailable namespace.

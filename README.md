@@ -2,10 +2,11 @@
 
 ## English
 
-**Current release: 0.1.10** — Two fixes on the 0.2.1 line:
+**Current release: 0.1.11** — On the 0.2.1 line:
 
 1. **Reasoning efforts follow the official declaration shape.** Keys are pi-ai thinking levels, values are the *wire* strings actually sent (with `off` as `null`), and the level list is read from the host's own schema the way the official Models page reads it. Previous releases wrote `value = level` and the string `'off'`, which silently mismapped any gateway whose wire vocabulary differs from pi-ai's.
-2. **Lookups identify the catalog record by the provider route being edited**, not by the model id alone. One id is listed by dozens of models.dev providers with different limits (measured: CommandCode reports `deepseek/deepseek-v4.1-flash` at 1000000/384000, SenseNova at 1048576/65536, NEAR at 131072/8192), so matching by id alone attached another vendor's numbers — and would have overwritten a correct configuration.
+2. **Lookups identify the catalog record by the provider's endpoint (`baseURL`) first.** models.dev publishes each provider's `api` URL, and that endpoint is what a deployment actually is: a route pointing at `api.commandcode.ai` resolves to the catalog's `commandcode` record whatever the route is named, and two account names on one gateway (such as `commandcode` and `goat-163`) correctly share one record. When the endpoint is unknown, the route name and then the model id's vendor prefix decide; when none of the three identifies a vendor, the id is reported 未收录 rather than attached to an arbitrary provider.
+3. **A model id alone does not identify catalog facts.** One id is listed by dozens of providers with different limits (measured: CommandCode 1000000/384000, SenseNova 1048576/65536, NEAR 131072/8192).
 
 For every configured `llm-pi-ai` provider card (custom OpenAI-compatible gateways such as the ones you add under Settings → Models), a `models.dev 参数` control fetches the official models.dev records for the provider's configured model ids and proposes the metadata pi-ai needs: context window, max output tokens, and reasoning-effort levels. One click writes the merged `models` array back to that provider profile through the official revision-aware Settings API.
 
@@ -34,7 +35,7 @@ Safety boundaries:
 - Nothing leaves the machine except the models.dev catalog request (Host side, optional shared proxy or `HTTPS_PROXY` fallback), and no credentials are ever sent.
 - Models whose id models.dev does not know are reported as 未收录 and left untouched.
 
-models.dev model ids are **not unique**: the same `deepseek/deepseek-v4.1-flash` is listed by dozens of providers with different limits. The matcher resolves the record by the **provider route being edited** first (a route named `commandcode` takes the catalog's `commandcode` record), then by the model id's vendor prefix, and reports the id as 未收录 when neither identifies a vendor — it never falls back to an arbitrary record. Attaching another vendor's context window would break requests far more confusingly than reporting a miss.
+models.dev model ids are **not unique**: the same `deepseek/deepseek-v4.1-flash` is listed by dozens of providers with different limits. The matcher resolves the record by the route's **endpoint** first (a route pointing at `api.commandcode.ai` takes the catalog's `commandcode` record, and two account names on that gateway share it), then by the route name, then by the model id's vendor prefix, and reports the id as 未收录 when none of them identifies a vendor — it never falls back to an arbitrary record. Attaching another vendor's context window would break requests far more confusingly than reporting a miss.
 
 ## 中文
 
