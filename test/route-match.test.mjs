@@ -108,3 +108,45 @@ test('two routes for the same id get their own vendor\'s numbers', () => {
   assert.equal(b.matched[0].maxOutput, 8192)
   assert.notEqual(a.matched[0].maxOutput, b.matched[0].maxOutput, 'same id, different route, different facts')
 })
+
+test('a route absent from the catalog still resolves through the id vendor prefix', () => {
+  // Our own route names are not in models.dev (`pipio-chat`, `open-design-go`).
+  // The model id's vendor prefix must still identify the record, exactly as it
+  // did before the route became part of the query — otherwise making the lookup
+  // route-aware silently broke every custom route name. This is a regression I
+  // introduced and caught live, so it is pinned here.
+  const catalog = parseModelsDevCatalog({
+    google: {
+      id: 'google', name: 'Google',
+      models: { 'gemini-3.8-flash': { id: 'gemini-3.8-flash', name: 'Gemini 3.8 Flash', limit: { context: 1048576, output: 65536 } } },
+    },
+    commandcode: {
+      id: 'commandcode', name: 'CommandCode',
+      models: { 'deepseek/deepseek-v4.1-flash': { id: 'deepseek/deepseek-v4.1-flash', name: 'V4.1', limit: { context: 1000000, output: 384000 } } },
+    },
+  })
+  // `gemini-3.8-flash-high` is the real route id; the catalog lists the undated
+  // family `gemini-3.8-flash`, so this exercises the NEAR path as well.
+  const hit = lookupModels(catalog, ['gemini-3.8-flash-high'], { route: 'pipio-chat' })
+  assert.equal(hit.matched.length, 1, 'a custom route must not shadow the vendor prefix')
+  assert.equal(hit.matched[0].providerId, 'google')
+  assert.equal(hit.matched[0].context, 1048576)
+})
+
+test('the route wins over the vendor prefix when both could answer', () => {
+  // `deepseek/...` hints at provider `deepseek`; a commandcode route must still
+  // take CommandCode's record. Route specificity beats prefix guessing.
+  const catalog = parseModelsDevCatalog({
+    deepseek: {
+      id: 'deepseek', name: 'DeepSeek',
+      models: { 'deepseek/deepseek-v4.1-flash': { id: 'deepseek/deepseek-v4.1-flash', name: 'Official', limit: { context: 999, output: 1 } } },
+    },
+    commandcode: {
+      id: 'commandcode', name: 'CommandCode',
+      models: { 'deepseek/deepseek-v4.1-flash': { id: 'deepseek/deepseek-v4.1-flash', name: 'V4.1', limit: { context: 1000000, output: 384000 } } },
+    },
+  })
+  const hit = lookupModels(catalog, ['deepseek/deepseek-v4.1-flash'], { route: 'commandcode' })
+  assert.equal(hit.matched[0].providerId, 'commandcode', 'the route identifies the deployment')
+  assert.equal(hit.matched[0].context, 1000000)
+})

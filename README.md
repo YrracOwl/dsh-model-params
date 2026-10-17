@@ -2,7 +2,7 @@
 
 ## English
 
-**Current release: 0.1.9** — Two fixes on the 0.2.1 line:
+**Current release: 0.1.10** — Two fixes on the 0.2.1 line:
 
 1. **Reasoning efforts follow the official declaration shape.** Keys are pi-ai thinking levels, values are the *wire* strings actually sent (with `off` as `null`), and the level list is read from the host's own schema the way the official Models page reads it. Previous releases wrote `value = level` and the string `'off'`, which silently mismapped any gateway whose wire vocabulary differs from pi-ai's.
 2. **Lookups identify the catalog record by the provider route being edited**, not by the model id alone. One id is listed by dozens of models.dev providers with different limits (measured: CommandCode reports `deepseek/deepseek-v4.1-flash` at 1000000/384000, SenseNova at 1048576/65536, NEAR at 131072/8192), so matching by id alone attached another vendor's numbers — and would have overwritten a correct configuration.
