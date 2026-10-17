@@ -429,7 +429,12 @@ test('the section page offers every real llm-pi-ai route and addresses the chose
   // response that lands after the page moved on cannot be shown beside another
   // provider's models
   assert.match(client, /rawResult\.route === route/)
-  assert.match(client, /setRawResult\(\{ route: targetRoute,/)
+  // The answer is stored WITH its originating route; the exact literal spans
+  // several lines now that candidates travel with it, so assert the stamp plus the
+  // three channels rather than one formatting of the call.
+  assert.match(client, /setRawResult\(\{\s*\n?\s*route: targetRoute,/)
+  assert.match(client, /matched: data\.matched \|\| \[\]/)
+  assert.match(client, /candidates: data\.candidates \|\| \[\]/)
   const panel = rendered.children[1]
   const chooser = panel.children.find((child) => child && child.props && child.props.className === 'dpmRoute')
   assert.ok(chooser, 'a namespace with several providers must let the page choose one')
@@ -450,4 +455,139 @@ test('the section page offers every real llm-pi-ai route and addresses the chose
   assert.match(String(switchedPanel.children[0].children[0]), /^beta · /)
   const switchedSelect = switchedPanel.children.find((child) => child && child.props && child.props.className === 'dpmRoute')
   assert.equal(switchedSelect.children[1].props.value, 'beta')
+})
+
+// ── the candidate menu renders and drives the write ──────────────────────────
+//
+// The lookup can answer with a MENU instead of a match: when nothing identifies
+// the deployment but the catalog lists the model NAME under other providers. That
+// path is only real if the card draws the choices AND the chosen record reaches the
+// write, so this drives both against the card component itself rather than
+// asserting on source text.
+function loadClientWithLookup(reactHooks, payload) {
+  let spec = null
+  const sandbox = {
+    document: {
+      querySelector: () => undefined,
+      createElement: () => ({ dataset: {}, textContent: '' }),
+      head: { appendChild() {} },
+      addEventListener() {},
+      removeEventListener() {},
+    },
+    window: { __ModuleLoader__: { load(captured) { spec = captured } } },
+    setTimeout: () => 0,
+    clearTimeout: () => {},
+    AbortController: class { constructor() { this.signal = {} } abort() {} },
+    fetch: async () => ({ json: async () => payload }),
+  }
+  vm.createContext(sandbox)
+  vm.runInContext(client, sandbox, { filename: 'lib/client.js' })
+  const react = { createElement: (type, props, ...children) => ({ type, props: props || {}, children }), ...reactHooks }
+  const plugin = spec.factory((id) => {
+    if (id === 'react') return react
+    throw new Error('unexpected require(' + id + ')')
+  })
+  return { plugin, react }
+}
+
+const MENU_MODEL = { id: 'deepseek-v4.1-flash' }
+const MENU_VALUE = { providers: { 'open-design-go': { models: [MENU_MODEL] } } }
+const MENU_PAYLOAD = {
+  ok: true,
+  matched: [],
+  candidates: [{
+    requested: 'deepseek-v4.1-flash',
+    options: [
+      { providerId: 'commandcode', providerName: 'CommandCode', modelId: 'deepseek/deepseek-v4.1-flash', api: 'https://api.commandcode.ai/provider/v1', context: 1000000, maxOutput: 384000, efforts: ['low', 'high', 'max'] },
+      { providerId: 'sensenova', providerName: 'SenseNova', modelId: 'deepseek-v4.1-flash', api: 'https://api.sensenova.cn/v1', context: 1048576, maxOutput: 65536 },
+    ],
+  }],
+  unmatched: [],
+}
+
+test('a lookup that only offers candidates draws a menu instead of a dead end', async () => {
+  const host = createHookHost()
+  const { plugin } = loadClientWithLookup(host.hooks, MENU_PAYLOAD)
+  const { ctx, registered } = makeCtx({
+    services: ['configForms'],
+    slots: ['settings.models.provider-card'],
+    value: MENU_VALUE,
+  })
+  plugin.apply(ctx)
+  const element = registered[0].component({ provider: { entry: { provider: 'open-design-go', settingsNs: 'llm-pi-ai' }, provider: 'open-design-go' } })
+  host.mount()
+  const rendered = host.render(element.type, element.props)
+  // open the panel: the trigger's click runs the lookup
+  rendered.children[0].props.onClick()
+  await new Promise((resolve) => setImmediate(resolve))
+  const panel = host.render(element.type, element.props).children[1]
+  const text = JSON.stringify(panel)
+  assert.match(text, /选择该路由对应的官方 provider/, 'the menu heading must be drawn')
+  assert.match(text, /CommandCode/, 'every candidate is offered')
+  assert.match(text, /SenseNova/)
+  assert.doesNotMatch(text, /models\.dev 未收录/, 'a listed name is not a dead end')
+  // The trigger reports candidates as candidates, never as matches. Read it from
+  // the post-lookup render: the click above scheduled state, and the trigger text
+  // is derived from that state.
+  const trigger = String(host.render(element.type, element.props).children[0].children)
+  assert.match(trigger, /\+1\/1 匹配/, 'a candidate is counted separately from a match')
+})
+
+test('picking a candidate turns it into the numbers the write would use', async () => {
+  const host = createHookHost()
+  const { plugin } = loadClientWithLookup(host.hooks, MENU_PAYLOAD)
+  const writes = []
+  const { ctx, registered } = makeCtx({
+    services: ['configForms'],
+    slots: ['settings.models.provider-card'],
+    value: MENU_VALUE,
+  })
+  ctx.get = (name) => (name === 'configForms'
+    ? { get: () => ({ getSnapshot: () => ({ status: 'ready', writable: true, value: MENU_VALUE, revision: 1 }), subscribe: () => () => {} }) }
+    : undefined)
+  // Capture the official mutate call instead of reaching a real settings service.
+  const send = (payload) => { writes.push(payload); return Promise.resolve({ result: { ok: true } }) }
+  plugin.apply(Object.assign(ctx, { get: (name) => (name === 'remote' ? { settings: { mutate: (ns, ops, rev) => send({ ns, ops, rev }) } } : (name === 'configForms' ? { get: () => ({ getSnapshot: () => ({ status: 'ready', writable: true, value: MENU_VALUE, revision: 1 }), subscribe: () => () => {} }) } : undefined)) }))
+  const element = registered[0].component({ provider: { entry: { provider: 'open-design-go', settingsNs: 'llm-pi-ai' }, provider: 'open-design-go' } })
+  host.mount()
+  host.render(element.type, element.props).children[0].props.onClick()
+  await new Promise((resolve) => setImmediate(resolve))
+
+  // Choose CommandCode from the menu.
+  let panel = host.render(element.type, element.props).children[1]
+  const findButton = (node) => {
+    if (!node || typeof node !== 'object') return undefined
+    if (Array.isArray(node)) { for (const item of node) { const hit = findButton(item); if (hit) return hit } return undefined }
+    if (node.props && typeof node.props.onClick === 'function' && node.props.className && String(node.props.className).includes('dpmCand')) return node
+    for (const child of node.children || []) { const hit = findButton(child); if (hit) return hit }
+    return undefined
+  }
+  const cand = findButton(panel)
+  assert.ok(cand, 'the menu must expose clickable candidates')
+  assert.match(JSON.stringify(cand), /CommandCode/)
+  cand.props.onClick()
+  panel = host.render(element.type, element.props).children[1]
+  // The chosen record's numbers are previewed for this model.
+  assert.match(JSON.stringify(panel), /1000000/)
+  assert.match(JSON.stringify(panel), /384000/)
+  assert.match(JSON.stringify(panel), /已选/)
+
+  // The apply button writes the chosen record's values through the official path.
+  const apply = (function find(node) {
+    if (!node || typeof node !== 'object') return undefined
+    if (Array.isArray(node)) { for (const item of node) { const hit = find(item); if (hit) return hit } return undefined }
+    if (node.props && typeof node.props.onClick === 'function' && String(node.props.className || '').includes('dpmPrimary')) return node
+    for (const child of node.children || []) { const hit = find(child); if (hit) return hit }
+    return undefined
+  })(panel)
+  assert.ok(apply, 'the apply control must be present')
+  await apply.props.onClick()
+  await new Promise((resolve) => setImmediate(resolve))
+  assert.equal(writes.length, 1, 'exactly one write')
+  const models = writes[0].ops[0].value
+  assert.equal(models[0].contextWindow, 1000000, 'the picked provider\'s context window, not another vendor\'s')
+  assert.equal(models[0].maxTokens, 384000)
+  // The bundle runs in its own VM context, so its object literals carry that
+  // realm's prototypes; compare plain data, not identity.
+  assert.equal(JSON.stringify(models[0].reasoningEfforts), JSON.stringify({ low: 'low', high: 'high', max: 'max' }))
 })

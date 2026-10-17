@@ -111,8 +111,9 @@ test('the endpoint also drives the near match', () => {
   assert.equal(hit.matched[0].maxOutput, 384000)
 })
 
-test('no endpoint, no route, no identifiable vendor -> unmatched, never a guess', () => {
+test('no endpoint, no route, no identifiable vendor -> no answer, only a menu', () => {
   const blind = lookupModels(index, ['deepseek/deepseek-v4.1-flash'])
-  assert.equal(blind.matched.length, 0)
-  assert.equal(blind.unmatched.length, 1)
+  assert.equal(blind.matched.length, 0, 'nothing identified the deployment, so nothing is asserted')
+  assert.equal(blind.candidates.length, 1, 'the official records are still offered by name')
+  assert.equal(blind.unmatched.length, 0, 'a listed name is not "unrecorded"')
 })

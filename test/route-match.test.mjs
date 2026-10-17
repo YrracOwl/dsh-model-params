@@ -32,11 +32,13 @@ const MULTI = {
 const index = parseModelsDevCatalog(MULTI)
 
 test('the route being edited decides which vendor\'s numbers are used', () => {
-  // Without a route the id-prefix rule runs and cannot identify a deployment;
-  // a wrong context window breaks requests far more confusingly than a miss.
+  // Without a route the id-prefix rule runs and cannot identify a deployment; a
+  // wrong context window breaks requests far more confusingly than a miss. So the
+  // lookup asserts NOTHING (matched is empty) — it offers the official records as
+  // a menu instead, which is a question for a human, not an answer.
   const blind = lookupModels(index, ['deepseek/deepseek-v4.1-flash'])
-  assert.equal(blind.unmatched.length, 1, 'no route and no identifiable vendor -> unmatched, never a guess')
-  assert.equal(blind.matched.length, 0)
+  assert.equal(blind.matched.length, 0, 'no route and no identifiable vendor -> no answer, never a guess')
+  assert.equal(blind.candidates.length, 1, 'but the official parameters are still offered, by name')
 })
 
 test('a route that names a catalog provider wins over the id-prefix rule', () => {
@@ -56,10 +58,12 @@ test('the route match is case-insensitive, like a settings route key', () => {
 test('a route with no matching catalog provider falls back to the id-prefix rule', () => {
   // `open-design-go` is OUR route name; models.dev has no such provider. The id
   // `deepseek-v4.1-flash` then resolves through the prefix rule, which points at
-  // `deepseek` — absent here, so nothing identifiable remains and the id is
-  // reported unmatched rather than attached to an arbitrary vendor.
+  // `deepseek` — absent here, so nothing identifiable remains: no answer, and the
+  // records that DO list the name are offered as a menu instead of a guess.
   const miss = lookupModels(index, ['deepseek-v4.1-flash'], { route: 'open-design-go' })
-  assert.equal(miss.unmatched.length, 1)
+  assert.equal(miss.matched.length, 0)
+  assert.equal(miss.candidates.length, 1, 'the name is listed elsewhere, so show those')
+  assert.equal(miss.candidates[0].options.length, 3)
 
   // But when the prefix rule DOES name a provider present in the catalog, it is
   // used: `gpt-*` -> openai.

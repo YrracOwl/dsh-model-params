@@ -52,9 +52,15 @@ After bundle or manifest changes refresh the workspace metadata generator (`node
   1. **the route's `baseURL` against the catalog provider's `api`** — the endpoint is what a deployment IS, and one gateway can carry several account names (our `commandcode` and `goat-163` share `api.commandcode.ai` and must share one record, with no per-route table);
   2. the route id, when it happens to name a catalog provider;
   3. the model id's vendor prefix;
-  4. unmatched.
+  4. **a candidate menu by model name** — see below.
 
   It must NOT fall back to "the first record with metadata": a wrong context window silently breaks every request on that route, which is worse than reporting 未收录. `normalizeApi` compares scheme+host+path and ignores case, a trailing slash, and default ports. The client sends `&route=` and `&baseURL=`; `test/baseurl-match.test.mjs` and `test/route-match.test.mjs` pin all of this.
+- **Unidentified deployment → menu, not a dead end.** When steps 1–3 identify nothing, `lookupModels` returns `candidates: [{ requested, options[], near? }]` built by `recordsOfName` (match the name AFTER the last `/`, so a provider keying its copy with a vendor prefix is not dropped) and ordered by `rankCandidates`. Rules that must not drift:
+  - a candidate is **never** auto-applied; only an explicit click in the panel puts it in the write, and only the picked record's own numbers are previewed (`chosen[id]` in `lib/client.js`);
+  - **no menu when `byApi` or a route-named catalog provider already identified the deployment** — there a miss is real, and another vendor's numbers would be systematically wrong;
+  - `MAX_CANDIDATES` caps the payload (32), the panel collapses to `CANDIDATES_SHOWN` (6) with an expand affordance, and truncation must not be the thing that hides the right vendor;
+  - `relatedName` accepts a **short affix** only (`gemini-3.8-flash-high` ↔ `gemini-3.8-flash`), never mere containment, so an unrelated model is never dressed up as this one;
+  - `test/candidates.test.mjs` pins the ladder, and `test/lifecycle-source.test.mjs` drives the real card through lookup → menu → pick → write.
 - Effort policy change: update both `THINKING_LEVELS`/`intersectLevels` copies and their guards.
 - Provider-card owner-props change upstream: re-verify the defensive route derivation and the UI on the real Models page.
 - Section-seat owner-props change upstream (`SettingsSectionOwnerProps`): re-verify that the page still resolves a real provider on its own, still offers a chooser only among real routes, and still explains an empty/unavailable namespace.

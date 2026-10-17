@@ -2,11 +2,12 @@
 
 ## English
 
-**Current release: 0.1.11** — On the 0.2.1 line:
+**Current release: 0.1.12** — On the 0.2.1 line:
 
 1. **Reasoning efforts follow the official declaration shape.** Keys are pi-ai thinking levels, values are the *wire* strings actually sent (with `off` as `null`), and the level list is read from the host's own schema the way the official Models page reads it. Previous releases wrote `value = level` and the string `'off'`, which silently mismapped any gateway whose wire vocabulary differs from pi-ai's.
-2. **Lookups identify the catalog record by the provider's endpoint (`baseURL`) first.** models.dev publishes each provider's `api` URL, and that endpoint is what a deployment actually is: a route pointing at `api.commandcode.ai` resolves to the catalog's `commandcode` record whatever the route is named, and two account names on one gateway (such as `commandcode` and `goat-163`) correctly share one record. When the endpoint is unknown, the route name and then the model id's vendor prefix decide; when none of the three identifies a vendor, the id is reported 未收录 rather than attached to an arbitrary provider.
-3. **A model id alone does not identify catalog facts.** One id is listed by dozens of providers with different limits (measured: CommandCode 1000000/384000, SenseNova 1048576/65536, NEAR 131072/8192).
+2. **Lookups identify the catalog record by the provider's endpoint (`baseURL`) first.** models.dev publishes each provider's `api` URL, and that endpoint is what a deployment actually is: a route pointing at `api.commandcode.ai` resolves to the catalog's `commandcode` record whatever the route is named, and two account names on one gateway (such as `commandcode` and `goat-163`) correctly share one record. When the endpoint is unknown, the route name and then the model id's vendor prefix decide.
+3. **When nothing identifies the deployment, the official parameters are still offered by model name.** A route whose endpoint the catalog does not know (our `open-design-go`) used to dead-end at 未收录 even though the catalog lists that model under other providers. The lookup now returns those records as a **candidate menu**: the panel lists them, a human picks the one this route actually points at, and only then are the numbers previewed and written. A menu is a question, never an automatic answer — no candidate is applied without a click.
+4. **A model id alone does not identify catalog facts.** One id is listed by dozens of providers with different limits (measured: CommandCode 1000000/384000, SenseNova 1048576/65536, NEAR 131072/8192), which is why a candidate menu needs a human choice rather than a heuristic pick.
 
 For every configured `llm-pi-ai` provider card (custom OpenAI-compatible gateways such as the ones you add under Settings → Models), a `models.dev 参数` control fetches the official models.dev records for the provider's configured model ids and proposes the metadata pi-ai needs: context window, max output tokens, and reasoning-effort levels. One click writes the merged `models` array back to that provider profile through the official revision-aware Settings API.
 
@@ -33,9 +34,11 @@ Safety boundaries:
 - Default policy fills **missing** parameters only; tick **覆盖已有值** to also replace differing ones.
 - At the top of the panel, optionally enable one shared models.dev request proxy and edit its URL. The setting is shared by every provider card, applies to the next lookup, and does not change any LLM provider `baseURL`.
 - Nothing leaves the machine except the models.dev catalog request (Host side, optional shared proxy or `HTTPS_PROXY` fallback), and no credentials are ever sent.
-- Models whose id models.dev does not know are reported as 未收录 and left untouched.
+- Models whose id the catalog lists under other providers get a **candidate menu** (see below) instead of a dead end; an id no provider lists at all is reported as 未收录 and left untouched.
 
-models.dev model ids are **not unique**: the same `deepseek/deepseek-v4.1-flash` is listed by dozens of providers with different limits. The matcher resolves the record by the route's **endpoint** first (a route pointing at `api.commandcode.ai` takes the catalog's `commandcode` record, and two account names on that gateway share it), then by the route name, then by the model id's vendor prefix, and reports the id as 未收录 when none of them identifies a vendor — it never falls back to an arbitrary record. Attaching another vendor's context window would break requests far more confusingly than reporting a miss.
+models.dev model ids are **not unique**: the same `deepseek/deepseek-v4.1-flash` is listed by dozens of providers with different limits. The matcher resolves the record by the route's **endpoint** first (a route pointing at `api.commandcode.ai` takes the catalog's `commandcode` record, and two account names on that gateway share it), then by the route name, then by the model id's vendor prefix.
+
+When none of those identifies a deployment, the plugin does **not** attach an arbitrary record — but it no longer stops at 未收录 either. It offers the records that list that model NAME as a candidate menu (`candidates` in the lookup response), collapsed to a few with a **展开其余 N 个** affordance, each labelled with its own context/max-output numbers. Picking one marks it **已选**, previews exactly what would be written, and includes it in the write; nothing is chosen for you. A menu never appears when the endpoint or route name has already identified the deployment — there, a model the deployment does not serve is a genuine miss, and another vendor's numbers would be systematically wrong.
 
 ## 中文
 
@@ -46,7 +49,12 @@ models.dev model ids are **not unique**: the same `deepseek/deepseek-v4.1-flash`
 - 默认仅补缺失参数；勾选「覆盖已有值」才替换差异值。
 - 窗口顶部可启用一个所有 provider 共用的 models.dev 请求代理并编辑地址；它只影响下一次参数查询，不改变任何 LLM provider 的 `baseURL`。
 - Host 只负责拉取并缓存 models.dev 目录（6 小时，支持公共代理或 `HTTPS_PROXY` 回退），不接触任何 LLM 配置与凭据。
-- models.dev 未收录的模型 id 会明确标记，不写入。
+
+匹配顺序：先按该 provider 的 **端点（`baseURL`）** 认领 models.dev 里同 `api` 的 vendor（`commandcode` 与 `goat-163` 共用 `api.commandcode.ai`，因此共用同一份官方记录），其次按路由名，最后按模型 id 的厂商前缀。
+
+三者都认不出部署时，插件**不再直接判「未收录」**：只要目录里有其它 provider 收录了同名模型，就列出这些官方参数作为**候选**，默认折叠、可展开，每条都带它自己的上下文 / max 输出数值；点选后标记「已选」并计入写入内容。**候选永远不会自动选中，也永远不会在不点选的情况下写入** —— 同一个模型名可能被二十多个 provider 收录且数值各不相同，只有你知道这条路由实际指向哪一家。
+
+反之，端点和路由名已经认出部署时不会给候选：那种情况该模型确实不在该部署的服务范围内，套用其它厂商的数值只会更错。目录里任何 provider 都没有收录的 id 仍标记为「未收录」且不写入。
 
 ## Install
 
